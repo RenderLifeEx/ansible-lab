@@ -1,0 +1,358 @@
+---
+- name: Configure Ubuntu 24.04 for RenderLife project
+  hosts: localhost
+  connection: local
+  become: yes
+
+  vars:
+    swap_size: "1G"
+    NODEJS_VERSION: "20"
+    project_dir: /var/www/renderlife
+    backend_dir: "{{ project_dir }}/backend"
+    app_port: 3000
+    data_dir: /data
+
+  tasks:
+    # Обновление apt-кеша
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # Установка базовых пакетов
+    - name: Install essential packages
+      apt:
+        name:
+          - git
+          - htop
+          - ca-certificates
+          - gnupg
+        update_cache: yes
+        state: present
+
+    # Проверка что Node.js не установлен
+    - name: Check if Node.js exists
+      stat:
+        path: /usr/bin/node
+      register: node_installed
+
+    # Настройка swap
+    - name: Create swap file
+      command: fallocate -l {{ swap_size }} /swapfile
+      args:
+        creates: /swapfile
+
+    - name: Set swap file permissions
+      file:
+        path: /swapfile
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Format swap
+      command: mkswap /swapfile
+      args:
+        creates: /swapfile
+
+    - name: Activate swap
+      command: swapon /swapfile
+      args:
+        creates: /proc/swaps
+
+    # Добавление ключа NodeSource (новый метод)
+    - name: Add NodeSource GPG key
+      apt_key:
+        url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
+        id: "1655A0AB68576280"
+        state: present
+
+    # Добавление репозитория (исправленная версия)
+    - name: Add NodeSource repository
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ NODEJS_VERSION }}.x | bash -
+      args:
+        executable: /bin/bash
+
+    # Установка Node.js
+    - name: Install Node.js
+      apt:
+        name:
+          - nodejs
+        state: present
+        update_cache: yes
+
+    # Установка PM2
+    - name: Install PM2 globally
+      npm:
+        name: pm2
+        global: yes
+        state: present
+
+    - name: Debug user info
+      debug:
+        msg: "Current user: {{ ansible_user_id }}"
+
+    # Создание структуры проекта
+    - name: Create project directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user_id | default('root') }}"
+        group: www-data
+        mode: '0775'
+      loop:
+        - "{{ project_dir }}"
+        - "{{ project_dir }}/frontend"
+        - "{{ backend_dir }}"
+        - "{{ project_dir }}/logs"
+        - "{{ backend_dir }}/data"  # Для файловой БД
+      vars:
+        ansible_user_id: "{{ ansible_user | default(lookup('env', 'USER')) }}"
+
+    # Настройка прав
+    - name: Configure project permissions
+      block:
+        # 1. Определяем пользователя развертывания
+        - name: Get current user
+          command: whoami
+          register: current_user
+          changed_when: false
+
+        # 2. Устанавливаем владельца и группу
+        - name: Apply directory permissions
+          file:
+            path: "{{ project_dir }}"
+            owner: "{{ current_user.stdout }}"
+            group: www-data
+            recurse: yes
+            mode: '0775'
+
+        # 3. Исправленная версия установки прав для файлов
+        - name: Set correct file permissions
+          command: find "{{ project_dir }}" -type f -exec chmod 664 {} \;
+          args:
+            creates: "{{ project_dir }}/.permissions_set"  # Флаг для идемпотентности
+          register: file_perms
+          changed_when: file_perms.rc == 0
+
+        # 4. Создаем файл-маркер после успешной установки прав
+        - name: Create permissions marker file
+          file:
+            path: "{{ project_dir }}/.permissions_set"
+            state: touch
+            mode: '0644'
+          when: file_perms.rc == 0
+
+      rescue:
+        - name: Fallback permission setting
+          file:
+            path: "{{ project_dir }}"
+            owner: root
+            group: www-data
+            recurse: yes
+            mode: '0775'
+          when: true  # Установите true для активации fallback
+
+    # Создание frontend/index.html
+    - name: Create frontend index.html from template
+      template:
+        src: "templates/todo_app.html.j2"
+        dest: "{{ project_dir }}/frontend/index.html"
+        mode: '0644'
+      tags: frontend
+
+    - name: Deploy Express server
+      template:
+        src: "templates/server.ts.j2"
+        dest: "{{ project_dir }}/backend/server.ts"
+        mode: '0755'
+      tags: backend
+
+    - name: Install Express dependencies
+      npm:
+        path: "{{ backend_dir }}"
+        name: express
+        state: present
+
+    - name: Install TypeScript and ts-node
+      npm:
+        path: "{{ backend_dir }}"
+        name: "{{ item }}"
+        state: present
+        production: no
+      loop:
+        - typescript
+        - ts-node
+        - "@types/express"
+        - "@types/node"
+
+    # Создание backend/.env
+    - name: Create backend .env file
+      copy:
+        dest: "{{ project_dir }}/backend/.env"
+        content: |
+          PORT=3000
+          DATA_FILE=./data/todos.json
+        mode: '0640'
+
+    - name: Configure Nginx
+      block:
+        # 1. Проверяем, установлен ли Nginx
+        - name: Check if Nginx is installed
+          command: which nginx
+          register: nginx_check
+          ignore_errors: yes
+          changed_when: false
+
+        # 2. Создаем директории конфигурации
+        - name: Ensure Nginx config directories exist
+          file:
+            path: "{{ item }}"
+            state: directory
+            mode: '0755'
+          loop:
+            - /etc/nginx/sites-available
+            - /etc/nginx/sites-enabled
+          when: nginx_check.rc == 0
+
+        # 3. Настраиваем конфиг
+        - name: Configure Nginx for renderlife
+          copy:
+            dest: /etc/nginx/sites-available/renderlife.conf
+            content: |
+              server {
+                  listen 80;
+                  server_name renderlife.ru;
+
+                  root {{ project_dir }}/frontend;
+                  index index.html;
+
+                  location / {
+                      try_files $uri $uri/ /index.html;
+                  }
+
+                  location /api/ {
+                      proxy_pass http://localhost:3000/;
+                      proxy_http_version 1.1;
+                      proxy_set_header Upgrade $http_upgrade;
+                      proxy_set_header Connection 'upgrade';
+                      proxy_set_header Host $host;
+                      proxy_cache_bypass $http_upgrade;
+                  }
+
+                  access_log {{ project_dir }}/logs/nginx-access.log;
+                  error_log {{ project_dir }}/logs/nginx-error.log;
+              }
+            mode: '0644'
+          when: nginx_check.rc == 0
+
+        # 4. Активируем конфигурацию
+        - name: Enable site configuration
+          file:
+            src: /etc/nginx/sites-available/renderlife.conf
+            dest: /etc/nginx/sites-enabled/renderlife.conf
+            state: link
+          when: nginx_check.rc == 0
+
+        # 5. Проверяем конфигурацию
+        - name: Test Nginx configuration
+          command: nginx -t
+          register: nginx_test
+          changed_when: false
+          notify: Restart Nginx
+          when: nginx_check.rc == 0
+
+      rescue:
+        - name: Warn about Nginx not being installed
+          debug:
+            msg: "Nginx is not installed, skipping configuration"
+          when: nginx_check.rc != 0
+
+    - name: Create PM2 ecosystem.config.js
+      copy:
+        dest: "{{ project_dir }}/ecosystem.config.js"
+        content: |
+          module.exports = {
+            apps: [{
+              name: 'renderlife-backend',
+              cwd: '{{ backend_dir }}',
+              script: 'npx',
+              args: 'ts-node server.ts',
+              watch: true,
+              env: {
+                NODE_ENV: 'development',
+                PORT: '{{ app_port }}'
+              },
+              env_production: {
+                NODE_ENV: 'production'
+              }
+            }]
+          }
+        mode: '0644'
+
+    - name: Setup PM2 startup
+      command: pm2 startup
+      register: pm2_startup
+      changed_when: false
+
+    - name: Start app with PM2
+      shell: |
+        pm2 start {{ project_dir }}/ecosystem.config.js
+        pm2 save
+      args:
+        executable: /bin/bash
+      tags: pm2start
+
+    - name: Show PM2 process list
+      command: pm2 list
+      register: pm2_status
+      changed_when: false
+
+    - name: Debug PM2 status
+      debug:
+        var: pm2_status.stdout_lines
+
+    # - name: Start application with PM2
+    #   block:
+    #     # 1. Определяем пользователя
+    #     - name: Get current user
+    #       command: whoami
+    #       register: current_user
+    #       changed_when: false
+
+    #     # 2. Устанавливаем переменные окружения
+    #     - name: Set PM2 environment
+    #       command: |
+    #         pm2 start {{ project_dir }}/ecosystem.config.js
+    #         pm2 save
+    #       environment:
+    #         PM2_HOME: "/home/{{ current_user.stdout }}/.pm2"
+    #         PATH: "{{ ansible_env.PATH }}:/usr/bin:/usr/local/bin"
+    #       args:
+    #         executable: /bin/bash
+
+    #     # 3. Проверяем статус
+    #     - name: Verify PM2 status
+    #       command: pm2 list
+    #       register: pm2_status
+    #       changed_when: false
+
+    #     - name: Show PM2 status
+    #       debug:
+    #         msg: "PM2 processes: {{ pm2_status.stdout_lines }}"
+
+      # rescue:
+      #   - name: Fallback PM2 start
+      #     command: |
+      #       pm2 start {{ project_dir }}/ecosystem.config.js
+      #       pm2 save
+      #     args:
+      #       executable: /bin/bash
+      #     environment:
+      #       PM2_HOME: "/root/.pm2"
+
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted

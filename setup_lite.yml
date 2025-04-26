@@ -1,0 +1,53 @@
+---
+- name: Configure Ubuntu 24.04 for RenderLife project
+  hosts: localhost
+  connection: local
+  become: yes
+
+  vars:
+    project_dir: /var/www/renderlife
+    swap_size: "1G"
+    node_version: "20.13.1"  # Версия для NVM
+
+  tasks:
+    - name: Install essential packages
+      apt:
+        name:
+          - git
+          - htop
+        update_cache: yes
+        state: present
+
+    # Установка NVM и нужной версии Node.js
+    - name: Install NVM and Node.js
+      block:
+        - name: Download and install NVM
+          shell: |
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+            echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc
+            echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc
+            echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> ~/.bashrc
+          args:
+            executable: /bin/bash
+            creates: "~/.nvm/nvm.sh"
+
+        - name: Install Node.js via NVM
+          shell: |
+            source ~/.nvm/nvm.sh
+            nvm install {{ node_version }}
+            nvm alias default {{ node_version }}
+          args:
+            executable: /bin/bash
+
+        - name: Install global packages
+          shell: |
+            source ~/.nvm/nvm.sh
+            npm install -g pm2 pnpm
+          args:
+            executable: /bin/bash
+
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted

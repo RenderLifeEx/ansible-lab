@@ -1,0 +1,140 @@
+---
+- name: Настройка окружения под Ubuntu 24.04
+  hosts: localhost
+  become: yes
+  vars:
+    project_root: /var/www/renderlife
+    frontend_path: /var/www/renderlife/frontend
+    backend_path: /var/www/renderlife/backend
+    logs_path: /var/www/renderlife/logs
+    env_path: /var/www/renderlife/.env
+    user_name: "{{ lookup('env', 'USER') }}"
+
+  tasks:
+    - name: Установка необходимых пакетов
+      apt:
+        name:
+          - git
+          - htop
+        state: present
+        update_cache: yes
+
+    - name: Создание структуры папок проекта
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ user_name }}"
+        group: www-data
+        mode: '0755'
+      loop:
+        - "{{ project_root }}"
+        - "{{ frontend_path }}"
+        - "{{ backend_path }}"
+        - "{{ logs_path }}"
+
+    - name: Создание .env файла
+      copy:
+        dest: "{{ env_path }}"
+        content: |
+          APP_ENV=development
+          PORT=3000
+        owner: "{{ user_name }}"
+        group: www-data
+        mode: '0644'
+
+    - name: Установка прав доступа к проекту
+      shell: |
+        sudo chown -R {{ user_name }}:www-data {{ project_root }}
+        sudo chmod -R 755 {{ project_root }}
+      args:
+        executable: /bin/bash
+
+    - name: Проверка прав на запись в папку backend
+      ansible.builtin.command: test -w {{ backend_path }}
+      register: write_check
+      ignore_errors: yes
+
+    - name: Проверка успешности записи
+      debug:
+        msg: "✅ Папка backend доступна для записи"
+      when: write_check.rc == 0
+
+    - name: Предупреждение при отсутствии прав на запись
+      debug:
+        msg: "❌ Папка backend недоступна для записи"
+      when: write_check.rc != 0
+
+    - name: Создание шаблона index.html (ToDo на чистом JS)
+      copy:
+        dest: "{{ frontend_path }}/index.html"
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>ToDo App</title>
+          </head>
+          <body>
+            <h1>ToDo List</h1>
+            <input type="text" id="taskInput" placeholder="Enter task">
+            <button onclick="addTask()">Add</button>
+            <ul id="taskList"></ul>
+
+            <script>
+              function addTask() {
+                const input = document.getElementById('taskInput');
+                const task = input.value.trim();
+                if (task) {
+                  const li = document.createElement('li');
+                  li.textContent = task;
+                  document.getElementById('taskList').appendChild(li);
+                  input.value = '';
+                }
+              }
+            </script>
+          </body>
+          </html>
+        owner: "{{ user_name }}"
+        group: www-data
+        mode: '0644'
+
+    - name: Создание шаблона простого backend (NestJS + file DB)
+      copy:
+        dest: "{{ backend_path }}/main.js"
+        content: |
+          const http = require('http');
+          const fs = require('fs');
+          const PORT = 3000;
+          const DB_FILE = './db.json';
+
+          const requestHandler = (req, res) => {
+            if (req.method === 'POST' && req.url === '/save') {
+              let body = '';
+              req.on('data', chunk => body += chunk);
+              req.on('end', () => {
+                const data = JSON.parse(body);
+                const existing = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE)) : [];
+                existing.push(data);
+                fs.writeFileSync(DB_FILE, JSON.stringify(existing, null, 2));
+                res.writeHead(200);
+                res.end('Saved');
+              });
+            } else {
+              res.writeHead(404);
+              res.end('Not found');
+            }
+          };
+
+          const server = http.createServer(requestHandler);
+          server.listen(PORT, () => console.log('Server running on port ' + PORT));
+        owner: "{{ user_name }}"
+        group: www-data
+        mode: '0755'
+
+    - name: Создание пустой файл-базы данных
+      copy:
+        dest: "{{ backend_path }}/db.json"
+        content: "[]"
+        owner: "{{ user_name }}"
+        group: www-data
+        mode: '0664'
