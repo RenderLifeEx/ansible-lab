@@ -27,8 +27,10 @@
           - htop
           - ca-certificates
           - gnupg
+          - bzip2
         update_cache: yes
         state: present
+      tags: apt
 
     # Проверка что Node.js не установлен
     - name: Check if Node.js exists
