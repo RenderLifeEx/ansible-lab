@@ -50,7 +50,13 @@ git clone git@github.com:RenderLifeEx/ansible-lab.git
 cd ansible-lab
 ```
 
-2. Запустите базовый плейбук:
+2.1. Запустите базовый плейбук на машине где требуется настройка
+```bash
+ansible-playbook playbooks/base-setup.yml -K -v
+ansible-playbook playbooks/base-setup.yml -K -v -tags "pm2start"
+```bash
+
+2.2. Запустите базовый плейбук с локальной машины:
 
 ```bash
 ansible-playbook -i inventory/staging playbooks/base-setup.yml

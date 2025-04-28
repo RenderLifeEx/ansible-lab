@@ -153,48 +153,6 @@
             mode: '0775'
           when: true  # Установите true для активации fallback
 
-    # Создание frontend/index.html
-    - name: Create frontend index.html from template
-      template:
-        src: "templates/todo_app.html.j2"
-        dest: "{{ project_dir }}/frontend/index.html"
-        mode: '0644'
-      tags: frontend
-
-    - name: Deploy Express server
-      template:
-        src: "templates/server.ts.j2"
-        dest: "{{ project_dir }}/backend/server.ts"
-        mode: '0755'
-      tags: backend
-
-    - name: Install Express dependencies
-      npm:
-        path: "{{ backend_dir }}"
-        name: express
-        state: present
-
-    - name: Install TypeScript and ts-node
-      npm:
-        path: "{{ backend_dir }}"
-        name: "{{ item }}"
-        state: present
-        production: no
-      loop:
-        - typescript
-        - ts-node
-        - "@types/express"
-        - "@types/node"
-
-    # Создание backend/.env
-    - name: Create backend .env file
-      copy:
-        dest: "{{ project_dir }}/backend/.env"
-        content: |
-          PORT=3000
-          DATA_FILE=./data/todos.json
-        mode: '0640'
-
     - name: Configure Nginx
       block:
         # 1. Проверяем, установлен ли Nginx
