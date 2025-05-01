@@ -83,6 +83,14 @@
         state: present
         update_cache: yes
 
+    # Установка pnpm глобально
+    - name: Install pnpm globally
+      npm:
+        name: pnpm
+        global: yes
+        state: present
+      tags: pnpm
+
     # Установка PM2
     - name: Install PM2 globally
       npm:
