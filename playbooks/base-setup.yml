@@ -172,7 +172,14 @@
           ignore_errors: yes
           changed_when: false
 
-        # 2. Создаем директории конфигурации
+        # 2. Устанавливаем Nginx если не установлен
+        - name: Install Nginx if not installed
+          apt:
+            name: nginx
+            state: present
+          when: nginx_check.rc != 0
+
+        # 3. Создаем директории конфигурации
         - name: Ensure Nginx config directories exist
           file:
             path: "{{ item }}"
@@ -183,7 +190,16 @@
             - /etc/nginx/sites-enabled
           when: nginx_check.rc == 0
 
-        # 3. Настраиваем конфиг
+        # 4. Модифицируем nginx.conf для включения sites-enabled
+        - name: Ensure Nginx includes sites-enabled
+          lineinfile:
+            path: /etc/nginx/nginx.conf
+            insertafter: 'http {'
+            line: '    include /etc/nginx/sites-enabled/*;'
+            state: present
+          notify: Restart Nginx
+
+        # 5. Настраиваем конфиг
         - name: Configure Nginx for renderlife
           copy:
             dest: /etc/nginx/sites-available/renderlife.conf
@@ -200,7 +216,7 @@
                   }
 
                   location /api/ {
-                      proxy_pass http://localhost:3000/;
+                      proxy_pass http://localhost:3001/;
                       proxy_http_version 1.1;
                       proxy_set_header Upgrade $http_upgrade;
                       proxy_set_header Connection 'upgrade';
@@ -214,7 +230,7 @@
             mode: '0644'
           when: nginx_check.rc == 0
 
-        # 4. Активируем конфигурацию
+        # 6. Активируем конфигурацию
         - name: Enable site configuration
           file:
             src: /etc/nginx/sites-available/renderlife.conf
@@ -235,28 +251,6 @@
           debug:
             msg: "Nginx is not installed, skipping configuration"
           when: nginx_check.rc != 0
-
-    - name: Create PM2 ecosystem.config.js
-      copy:
-        dest: "{{ project_dir }}/ecosystem.config.js"
-        content: |
-          module.exports = {
-            apps: [{
-              name: 'renderlife-backend',
-              cwd: '{{ backend_dir }}',
-              script: 'npx',
-              args: 'ts-node server.ts',
-              watch: true,
-              env: {
-                NODE_ENV: 'development',
-                PORT: '{{ app_port }}'
-              },
-              env_production: {
-                NODE_ENV: 'production'
-              }
-            }]
-          }
-        mode: '0644'
 
     - name: Setup PM2 startup
       command: pm2 startup
