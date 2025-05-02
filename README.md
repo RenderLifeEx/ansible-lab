@@ -28,6 +28,7 @@
 ansible-lab/
 ├── playbooks/
 │ ├── base-setup.yml # Базовое окружение
+│ ├── lite-setup.yml # Только нода и ...
 │ ├── nodejs-setup.yml # Установка Node.js + NVM
 │ ├── pm2-setup.yml # Настройка PM2
 │ └── docker-setup.yml # Установка Docker
