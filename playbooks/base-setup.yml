@@ -5,12 +5,14 @@
   become: yes
 
   vars:
+    site_name: RenderLife.ru
+    nginx_site_name: renderlife.ru
     swap_size: "1G"
     NODEJS_VERSION: "20"
-    project_dir: /var/www/renderlife
-    backend_dir: "{{ project_dir }}/backend"
+    project_dir: /var/www/{{ nginx_site_name }}
     app_port: 3000
     data_dir: /data
+    api_port: 3001
 
   tasks:
     # Удаление старого ключа репозитория NGINX
@@ -133,9 +135,8 @@
       loop:
         - "{{ project_dir }}"
         - "{{ project_dir }}/frontend"
-        - "{{ backend_dir }}"
         - "{{ project_dir }}/logs"
-        - "{{ backend_dir }}/data"  # Для файловой БД
+        - "{{ project_dir }}/backend"
       vars:
         ansible_user_id: "{{ ansible_user | default(lookup('env', 'USER')) }}"
 
@@ -144,7 +145,7 @@
         dest: "{{ project_dir }}/frontend/index.html"
         content: |
           <html>
-            <head><title>RenderLife</title></head>
+            <head><title>{{ site_name }}</title></head>
             <style>
               body {
                 font-family: Arial, sans-serif;
@@ -162,7 +163,7 @@
               }
             </style>
             <body>
-              <h1>Welcome to RenderLife!</h1>
+              <h1>Welcome to {{ site_name }}!</h1>
               <div>
                 <p>Update date and time: {{ ansible_date_time.iso8601 }}</p>
               </div>
@@ -252,41 +253,18 @@
           notify: Restart Nginx
 
         # 5. Настраиваем конфиг
-        - name: Configure Nginx for renderlife
-          copy:
-            dest: /etc/nginx/sites-available/renderlife.conf
-            content: |
-              server {
-                  listen 80;
-                  server_name renderlife.ru;
-
-                  root {{ project_dir }}/frontend;
-                  index index.html;
-
-                  location / {
-                      try_files $uri $uri/ /index.html;
-                  }
-
-                  location /api/ {
-                      proxy_pass http://localhost:3001/;
-                      proxy_http_version 1.1;
-                      proxy_set_header Upgrade $http_upgrade;
-                      proxy_set_header Connection 'upgrade';
-                      proxy_set_header Host $host;
-                      proxy_cache_bypass $http_upgrade;
-                  }
-
-                  access_log {{ project_dir }}/logs/nginx-access.log;
-                  error_log {{ project_dir }}/logs/nginx-error.log;
-              }
+        - name: Configure Nginx
+          template:
+            src: templates/nginx/site.conf.j2
+            dest: /etc/nginx/sites-available/{{ nginx_site_name }}.conf
             mode: '0644'
           when: nginx_check.rc == 0
 
         # 6. Активируем конфигурацию
         - name: Enable site configuration
           file:
-            src: /etc/nginx/sites-available/renderlife.conf
-            dest: /etc/nginx/sites-enabled/renderlife.conf
+            src: /etc/nginx/sites-available/{{ nginx_site_name }}.conf
+            dest: /etc/nginx/sites-enabled/{{ nginx_site_name }}.conf
             state: link
           when: nginx_check.rc == 0
 
