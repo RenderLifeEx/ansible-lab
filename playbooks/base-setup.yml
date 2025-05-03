@@ -255,7 +255,7 @@
         # 5. Настраиваем конфиг
         - name: Configure Nginx
           template:
-            src: templates/nginx/site.conf.j2
+            src: ../templates/nginx/site.conf.j2
             dest: /etc/nginx/sites-available/{{ nginx_site_name }}.conf
             mode: '0644'
           when: nginx_check.rc == 0
