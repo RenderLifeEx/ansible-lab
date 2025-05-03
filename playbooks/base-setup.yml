@@ -145,11 +145,27 @@
         content: |
           <html>
             <head><title>RenderLife</title></head>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                background: #f4f4f4;
+                text-align: center;
+                padding-top: 100px;
+              }
+              h1 {
+                font-size: 48px;
+                animation: colorShift 3s infinite alternate;
+              }
+              @keyframes colorShift {
+                0% { color: #007BFF; }   /* Синий */
+                100% { color: #6c757d; } /* Серый */
+              }
+            </style>
             <body>
-              <h1>{{ ansible_date_time.iso8601 }}</h1>
-              div>
-                <p>Welcome to RenderLife!</p>
+              <h1>Welcome to RenderLife!</h1>
+              <div>
                 <p>Current date and time: {{ ansible_date_time.iso8601 }}</p>
+              </div>
             </body>
           </html>
         mode: '0644'
