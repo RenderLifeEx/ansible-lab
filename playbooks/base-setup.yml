@@ -164,7 +164,7 @@
             <body>
               <h1>Welcome to RenderLife!</h1>
               <div>
-                <p>Current date and time: {{ ansible_date_time.iso8601 }}</p>
+                <p>Update date and time: {{ ansible_date_time.iso8601 }}</p>
               </div>
             </body>
           </html>
