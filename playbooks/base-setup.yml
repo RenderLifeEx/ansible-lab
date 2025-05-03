@@ -139,6 +139,22 @@
       vars:
         ansible_user_id: "{{ ansible_user | default(lookup('env', 'USER')) }}"
 
+    - name: Create index.html with current date and time
+      copy:
+        dest: "{{ project_dir }}/frontend/index.html"
+        content: |
+          <html>
+            <head><title>RenderLife</title></head>
+            <body>
+              <h1>{{ ansible_date_time.iso8601 }}</h1>
+              div>
+                <p>Welcome to RenderLife!</p>
+                <p>Current date and time: {{ ansible_date_time.iso8601 }}</p>
+            </body>
+          </html>
+        mode: '0644'
+      tags: index
+
     # Настройка прав
     - name: Configure project permissions
       block:
