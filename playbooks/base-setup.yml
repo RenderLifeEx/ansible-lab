@@ -13,19 +13,25 @@
     data_dir: /data
 
   tasks:
-    # Установка ключа репозитория NGINX
-    - name: Add NGINX signing key (modern method)
+    # Удаление старого ключа репозитория NGINX
+    - name: Remove old nginx GPG key if it exists
+      file:
+        path: /usr/share/keyrings/nginx.gpg
+        state: absent
+
+    # Скачивание и установка нового ключа репозитория NGINX
+    - name: Download and install updated nginx GPG key
       shell: |
         curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor | tee /usr/share/keyrings/nginx-archive-keyring.gpg > /dev/null
       args:
         executable: /bin/bash
 
-    # Добавление репозитория NGINX с корректным Signed-By
-    - name: Add NGINX apt repository
-      apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu noble nginx"
-        state: present
-        filename: nginx
+    - name: Configure nginx APT repository (Ubuntu 24.04)
+      copy:
+        dest: /etc/apt/sources.list.d/nginx.list
+        content: |
+          deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu noble nginx
+        mode: '0644'
 
     # Обновление apt-кеша после добавления репозиториев
     - name: Update apt cache
