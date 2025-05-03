@@ -19,6 +19,29 @@
         update_cache: yes
         cache_valid_time: 3600
 
+    # Добавление ключа Nginx (новый блок)
+    - name: Add Nginx signing key
+      shell: |
+        wget https://nginx.org/keys/nginx_signing.key -O - | apt-key add -
+      args:
+        executable: /bin/bash
+      register: nginx_key_added
+      changed_when: "'OK' in nginx_key_added.stdout"
+
+    # 3. Добавляем новые репозитории
+    - name: Add Nginx main repository
+      lineinfile:
+        path: /etc/apt/sources.list.d/nginx.list
+        line: 'deb [signed-by=/etc/apt/trusted.gpg.d/nginx.gpg] http://nginx.org/packages/ubuntu noble nginx'
+        create: yes
+        mode: '0644'
+
+    - name: Add Nginx source repository
+      lineinfile:
+        path: /etc/apt/sources.list.d/nginx.list
+        line: 'deb-src [signed-by=/etc/apt/trusted.gpg.d/nginx.gpg] http://nginx.org/packages/ubuntu noble nginx'
+        mode: '0644'
+
     # Установка базовых пакетов
     - name: Install essential packages
       apt:
