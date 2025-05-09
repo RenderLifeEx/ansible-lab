@@ -2,7 +2,7 @@ server {
     listen 80;
     server_name {{ nginx_site_name }};
 
-    root {{ project_dir_subdomain }};
+    root {{ project_dir_subdomain }}/frontend;
     index index.html;
 
     location / {

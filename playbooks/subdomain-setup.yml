@@ -55,50 +55,6 @@
         mode: '0644'
       tags: index
 
-    # Настройка прав
-    - name: Configure project permissions
-      block:
-        # 1. Определяем пользователя развертывания
-        - name: Get current user
-          command: whoami
-          register: current_user
-          changed_when: false
-
-        # 2. Устанавливаем владельца и группу
-        - name: Apply directory permissions
-          file:
-            path: "{{ project_dir_subdomain }}"
-            owner: "{{ current_user.stdout }}"
-            group: www-data
-            recurse: yes
-            mode: '0775'
-
-        # 3. Исправленная версия установки прав для файлов
-        - name: Set correct file permissions
-          command: find "{{ project_dir_subdomain }}" -type f -exec chmod 664 {} \;
-          args:
-            creates: "{{ project_dir_subdomain }}/.permissions_set"  # Флаг для идемпотентности
-          register: file_perms
-          changed_when: file_perms.rc == 0
-
-        # 4. Создаем файл-маркер после успешной установки прав
-        - name: Create permissions marker file
-          file:
-            path: "{{ project_dir_subdomain }}/.permissions_set"
-            state: touch
-            mode: '0644'
-          when: file_perms.rc == 0
-
-      rescue:
-        - name: Fallback permission setting
-          file:
-            path: "{{ project_dir_subdomain }}"
-            owner: root
-            group: www-data
-            recurse: yes
-            mode: '0775'
-          when: true  # Установите true для активации fallback
-
     - name: Deploy Nginx config for todo-jq
       template:
         src: ../templates/nginx/subdomain.conf.j2
