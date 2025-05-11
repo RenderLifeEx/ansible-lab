@@ -19,20 +19,19 @@
         state: present
         update_cache: yes
 
-    # 2. Добавление официального GPG-ключа Docker
+    # 2. Добавление официальных репозиториев Docker
     - name: Add Docker GPG key
       apt_key:
         url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
-    # 3. Добавление репозитория Docker
     - name: Add Docker repository
       apt_repository:
         repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
         state: present
         filename: docker-ce
 
-    # 4. Установка Docker Engine
+    # 3. Установка Docker и Compose
     - name: Install Docker CE
       apt:
         name:
@@ -43,6 +42,12 @@
           - docker-compose-plugin
         state: latest
         update_cache: yes
+
+    # 4. Установка standalone docker-compose из репозитория Ubuntu
+    - name: Install Docker Compose
+      apt:
+        name: docker-compose
+        state: present
 
     # 5. Добавление текущего пользователя в группу docker
     - name: Add user to docker group
@@ -58,12 +63,19 @@
         enabled: yes
         state: started
 
-    # 7. Проверка установки
-    - name: Verify Docker installation
-      command: docker --version
-      register: docker_version
-      changed_when: false
+    # 7. Проверка
+    - name: Verify installations
+      block:
+        - name: Check Docker
+          command: docker --version
+          register: docker_version
 
-    - name: Show Docker version
-      debug:
-        msg: "Docker installed: {{ docker_version.stdout }}"
+        - name: Check Docker Compose
+          command: docker-compose --version
+          register: compose_version
+
+        - name: Show versions
+          debug:
+            msg:
+              - "Docker: {{ docker_version.stdout }}"
+              - "Docker Compose: {{ compose_version.stdout }}"
