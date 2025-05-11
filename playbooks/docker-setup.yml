@@ -1,5 +1,10 @@
+---
 - name: Install Docker and Docker Compose
-  block:
+  hosts: localhost
+  connection: local
+  become: yes
+
+  tasks:
     # 1. Установка зависимостей
     - name: Install required packages
       apt:
@@ -59,9 +64,3 @@
     - name: Show Docker version
       debug:
         msg: "Docker installed: {{ docker_version.stdout }}"
-
-  rescue:
-    - name: Docker installation failed
-      debug:
-        msg: "Ошибка установки Docker, проверьте логи"
-      ignore_errors: yes
