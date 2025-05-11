@@ -4,6 +4,9 @@
   connection: local
   become: yes
 
+  vars:
+    docker_user: "{{ lookup('env', 'USER') }}"  # Используем текущего пользователя
+
   tasks:
     # 1. Установка зависимостей
     - name: Install required packages
@@ -44,7 +47,7 @@
     # 5. Добавление текущего пользователя в группу docker
     - name: Add user to docker group
       user:
-        name: "{{ ansible_user }}"
+        name: "{{ docker_user }}"
         groups: docker
         append: yes
 
