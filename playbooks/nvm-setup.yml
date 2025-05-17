@@ -1,7 +1,9 @@
 ---
 - name: Minimal NVM installation for root user
-  hosts: all
+  hosts: localhost
+  connection: local
   become: yes
+
   vars:
     # Узнать версию nvm можно тут https://github.com/nvm-sh/nvm
     nvm_version: "v0.40.3" # Можно указать актуальную версию NVM
