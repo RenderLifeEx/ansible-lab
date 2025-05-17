@@ -10,6 +10,7 @@
     nvm_install_dir: "/usr/local/nvm"
     default_user: "root"
     nvm_bashrc_path: "/root/.bashrc"
+    node_version: "lts/fermium"  # Node.js 14.x
 
   tasks:
     - name: Create NVM directory
@@ -30,26 +31,15 @@
       environment:
         NVM_DIR: "{{ nvm_install_dir }}"
 
-    - name: Verify installation
-      block:
-        - name: Check Node.js remains system default
-          command: node --version
-          register: node_check
-          changed_when: false
+    - name: Reload bashrc and verify NVM
+      shell: |
+        source /root/.bashrc
+        nvm --version
+        nvm install {{ node_version }}
+      args:
+        executable: /bin/bash
+      register: nvm_final_check
+      changed_when: false
 
-        - name: Ensure NVM works
-          shell: |
-            source "{{ nvm_install_dir }}/nvm.sh"
-            nvm --version
-          args:
-            executable: /bin/bash
-          register: nvm_check
-          environment:
-            NVM_DIR: "{{ nvm_install_dir }}"
-          changed_when: false
-
-        - name: Show status
-          debug:
-            msg: |
-              System Node.js preserved: {{ node_check.stdout }}
-              NVM installed: {{ nvm_check.stdout }}
+    - debug:
+        msg: "NVM version: {{ nvm_final_check.stdout }}"
