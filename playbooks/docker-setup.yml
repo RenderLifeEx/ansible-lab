@@ -71,7 +71,7 @@
           register: docker_version
 
         - name: Check Docker Compose
-          command: docker-compose --version
+          command: docker compose --version
           register: compose_version
 
         - name: Show versions

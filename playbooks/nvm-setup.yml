@@ -1,0 +1,53 @@
+---
+- name: Minimal NVM installation for root user
+  hosts: all
+  become: yes
+  vars:
+    # Узнать версию nvm можно тут https://github.com/nvm-sh/nvm
+    nvm_version: "v0.40.3" # Можно указать актуальную версию NVM
+    nvm_install_dir: "/usr/local/nvm"
+    default_user: "root"
+    nvm_bashrc_path: "/root/.bashrc"
+
+  tasks:
+    - name: Create NVM directory
+      file:
+        path: "{{ nvm_install_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ default_user }}"
+        group: "{{ default_user }}"
+
+    - name: Install NVM with system Node.js preservation
+      shell: |
+        curl -s -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh | PROFILE=/dev/null bash
+        echo 'export NVM_DIR="{{ nvm_install_dir }}"' >> "{{ nvm_bashrc_path }}"
+        echo '[ -s "{{ nvm_install_dir }}/nvm.sh" ] && \. "{{ nvm_install_dir }}/nvm.sh"' >> "{{ nvm_bashrc_path }}"
+      args:
+        executable: /bin/bash
+      environment:
+        NVM_DIR: "{{ nvm_install_dir }}"
+
+    - name: Verify installation
+      block:
+        - name: Check Node.js remains system default
+          command: node --version
+          register: node_check
+          changed_when: false
+
+        - name: Ensure NVM works
+          shell: |
+            source "{{ nvm_install_dir }}/nvm.sh"
+            nvm --version
+          args:
+            executable: /bin/bash
+          register: nvm_check
+          environment:
+            NVM_DIR: "{{ nvm_install_dir }}"
+          changed_when: false
+
+        - name: Show status
+          debug:
+            msg: |
+              System Node.js preserved: {{ node_check.stdout }}
+              NVM installed: {{ nvm_check.stdout }}
