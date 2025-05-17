@@ -21,7 +21,7 @@
         owner: "{{ default_user }}"
         group: "{{ default_user }}"
 
-    - name: Install NVM with system Node.js preservation
+    - name: Install NVM
       shell: |
         curl -s -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh | PROFILE=/dev/null bash
         echo 'export NVM_DIR="{{ nvm_install_dir }}"' >> "{{ nvm_bashrc_path }}"
@@ -30,16 +30,3 @@
         executable: /bin/bash
       environment:
         NVM_DIR: "{{ nvm_install_dir }}"
-
-    - name: Reload bashrc and verify NVM
-      shell: |
-        source /root/.bashrc
-        nvm --version
-        nvm install {{ node_version }}
-      args:
-        executable: /bin/bash
-      register: nvm_final_check
-      changed_when: false
-
-    - debug:
-        msg: "NVM version: {{ nvm_final_check.stdout }}"
