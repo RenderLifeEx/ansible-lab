@@ -5,7 +5,7 @@
   become: yes
 
   vars:
-    nginx_site_name: logger-old-node.renderlife.ru
+    nginx_site_name: bizoneplace.renderlife.ru
     project_dir_subdomain: /var/www/{{ nginx_site_name }}
     api_port_subdomain: 3003
 
