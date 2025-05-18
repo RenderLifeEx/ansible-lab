@@ -7,7 +7,7 @@
   vars:
     nginx_site_name: bizoneplace.renderlife.ru
     project_dir_subdomain: /var/www/{{ nginx_site_name }}
-    api_port_subdomain: 3003
+    api_port_subdomain: 3004
 
   tasks:
     - name: Create project directories for logger-old-node
