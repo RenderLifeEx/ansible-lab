@@ -1,0 +1,79 @@
+---
+- name: Setup Nginx site for subdomain
+  hosts: localhost
+  connection: local
+  become: yes
+
+  vars:
+    nginx_site_name: dz.renderlife.ru
+    project_dir_subdomain: /var/www/{{ nginx_site_name }}
+    api_port_subdomain: 3004
+
+  tasks:
+    - name: Create project directories for dz
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user | default('root') }}"
+        group: www-data
+        mode: '0775'
+      loop:
+        - "{{ project_dir_subdomain }}"
+        - "{{ project_dir_subdomain }}/frontend"
+        - "{{ project_dir_subdomain }}/logs"
+        - "{{ project_dir_subdomain }}/backend"
+
+    - name: Create index.html with current date and time
+      copy:
+        dest: "{{ project_dir_subdomain }}/frontend/index.html"
+        content: |
+          <html>
+            <head><title>Subdomain {{ nginx_site_name }}</title></head>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                background: #f4f4f4;
+                text-align: center;
+                padding-top: 100px;
+              }
+              h1 {
+                font-size: 38px;
+                animation: colorShift 3s infinite alternate;
+              }
+              @keyframes colorShift {
+                0% { color: #dc3545; }   /* Красный */
+                100% { color: #fd7e14; } /* Оранжевый */
+              }
+            </style>
+            <body>
+              <h1>Welcome to {{ nginx_site_name }}!</h1>
+              <div>
+                <p>Update date and time: {{ ansible_date_time.iso8601 }}</p>
+              </div>
+            </body>
+          </html>
+        mode: '0644'
+      tags: index
+
+    - name: Deploy Nginx config for logger-old-node
+      template:
+        src: ../templates/nginx/subdomain.conf.j2
+        dest: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+        mode: '0644'
+
+    - name: Enable logger-old-node site in Nginx
+      file:
+        src: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+        dest: "/etc/nginx/sites-enabled/{{ nginx_site_name }}.conf"
+        state: link
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+      failed_when: nginx_test.rc != 0
+
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded
