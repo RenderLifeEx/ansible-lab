@@ -55,13 +55,13 @@
         mode: '0644'
       tags: index
 
-    - name: Deploy Nginx config for todo-jq
+    - name: Deploy Nginx config for {{ nginx_site_name }}
       template:
-        src: ../../templates/nginx/subdomain.conf.j2
+        src: "{{ playbook_dir }}/../../templates/nginx/subdomain.conf.j2"
         dest: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
         mode: '0644'
 
-    - name: Enable todo-jq site in Nginx
+    - name: Enable {{ nginx_site_name }} site in Nginx
       file:
         src: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
         dest: "/etc/nginx/sites-enabled/{{ nginx_site_name }}.conf"
