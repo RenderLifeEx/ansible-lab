@@ -28,6 +28,9 @@
 ```bash
 ansible-lab/
 ├── playbooks/
+│ ├── subdomains # Создание поддоменов с окружением
+│ │ ├── subdomain-dz.yml z
+│ │ └── subdomain-todo-jq.yml
 │ ├── base-setup.yml # Базовое окружение
 │ ├── subdomain-setup.yml # Настройка поддомена
 │ ├── lite-setup.yml # Только нода и ...
