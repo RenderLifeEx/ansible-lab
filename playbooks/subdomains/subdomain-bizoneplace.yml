@@ -57,7 +57,7 @@
 
     - name: Deploy Nginx config for logger-old-node
       template:
-        src: ../templates/nginx/subdomain.conf.j2
+        src: ../../templates/nginx/subdomain.conf.j2
         dest: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
         mode: '0644'
 
