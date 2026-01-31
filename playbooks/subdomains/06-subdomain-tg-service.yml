@@ -5,11 +5,17 @@
   become: yes
 
   vars:
-    nginx_site_name: dz.renderlife.ru
+    nginx_site_name: tg-service.renderlife.ru
     project_dir_subdomain: /var/www/{{ nginx_site_name }}
-    api_port_subdomain: 3004
+    api_port_subdomain: 3006
 
   tasks:
+    - name: Generate random colors for animation
+      set_fact:
+        color_start: "#{{ '%06x' | format(range(0x111111, 0xEEEEEE) | random) }}"
+        color_end: "#{{ '%06x' | format(range(0x111111, 0xEEEEEE) | random) }}"
+      tags: index
+
     - name: Create project directories for dz
       file:
         path: "{{ item }}"
@@ -41,14 +47,17 @@
                 animation: colorShift 3s infinite alternate;
               }
               @keyframes colorShift {
-                0% { color: #dc3545; }   /* Красный */
-                100% { color: #fd7e14; } /* Оранжевый */
+                0% { color: {{ color_start }}; }
+                100% { color: {{ color_end }}; }
               }
             </style>
             <body>
               <h1>Welcome to {{ nginx_site_name }}!</h1>
               <div>
                 <p>Update date and time: {{ ansible_date_time.iso8601 }}</p>
+                <p style="font-size: 12px; color: #666; margin-top: 20px;">
+                  Colors: {{ color_start }} to {{ color_end }}
+                </p>
               </div>
             </body>
           </html>
